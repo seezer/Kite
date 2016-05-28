@@ -25,13 +25,16 @@ public:
 
     bool useTls;
     bool  hasTimeout;
+    bool ignoreSelfSignedError;
     Timer connectionTimout;
 
     SecureSocket *p;
     void d_connect();
+    bool isErrorIgnored(int err);
 
     SecureSocketPrivate(std::weak_ptr<Kite::EventLoop> ev)
         : Kite::Evented(ev)
+        , ignoreSelfSignedError(false)
         , connectionTimout(ev)
     {
         KITE_TIMER_DEBUG_NAME(&connectionTimout, "Kite::SecureSocketPrivate::connectionTimout");
@@ -164,6 +167,11 @@ bool SecureSocket::setClientKeyFile(const std::string &path)
     return true;
 }
 
+void SecureSocket::ignoreSelfSignedCertificateError(bool ignored)
+{
+    p->ignoreSelfSignedError = ignored;
+}
+
 void SecureSocket::disconnect()
 {
     int fd = 0;
@@ -279,7 +287,7 @@ void SecureSocketPrivate::d_connect()
 
     if (useTls) {
         auto result = SSL_get_verify_result(ssl);
-        if (result != X509_V_OK) {
+        if (result != X509_V_OK && !isErrorIgnored(result)) {
             std::stringstream str;
             str << "Secure Peer Verification Errror " << result;
             errorMessage = str.str();
@@ -302,6 +310,15 @@ void SecureSocketPrivate::d_connect()
 
     state        = SecureSocket::Connected;
     p->onConnected();
+}
+
+bool SecureSocketPrivate::isErrorIgnored(int err)
+{
+    return ignoreSelfSignedError
+            &&
+            ((err == X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT)
+             ||
+            (err == X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN));
 }
 
 int SecureSocket::write(const char *data, int len)

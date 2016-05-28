@@ -28,6 +28,7 @@ namespace Kite {
 
         bool setClientCertificateFile(const std::string &path);
         bool setClientKeyFile(const std::string &path);
+        void ignoreSelfSignedCertificateError(bool ignored);
 
         SocketState state() const;
         void connect(const std::string &hostname, int port, uint64_t timeout = 0, bool tls = false);
