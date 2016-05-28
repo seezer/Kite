@@ -11,6 +11,7 @@ public:
         : Kite::Timer(ev)
         , wall(ev)
     {
+        wall.start();
     }
     Kite::Timer wall;
 

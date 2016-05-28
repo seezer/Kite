@@ -17,6 +17,7 @@ Timer::Timer(const std::weak_ptr<EventLoop> &ev, uint64_t exp)
     :p_ev(ev)
     ,p_expires(0)
     ,p_period_intent(0)
+    ,p_start(0)
 {
     reset(exp);
 
@@ -24,7 +25,7 @@ Timer::Timer(const std::weak_ptr<EventLoop> &ev, uint64_t exp)
 }
 Timer::~Timer()
 {
-    reset(0);
+    removeFromEventLoop();
 }
 
 uint64_t Timer::now()
@@ -43,37 +44,24 @@ uint64_t Timer::reset(uint64_t exp)
     p_expires = exp;
     uint64_t el = elapsed();
 
-    struct timespec begin;
-    if (clock_gettime(CLOCK_MONOTONIC_RAW, &begin)) {
-        throw std::runtime_error("Kite::Timer: no clock :(");
-        p_start = 0;
-        return el;
+    if (exp > 0) {
+        start();
     }
-    p_start = begin.tv_sec  * 1000
-            + begin.tv_nsec * 1e-6;
-
     // add if was dead before and now active
     auto ev = p_ev.lock();
     if (ev) {
-        if (p_expires > 0) {
-            int cbefore = ev->p_timers.size();
-            ev->p_timers.insert(this);
-   //         std::cerr << "T " << this <<  " " <<  k__debugName << " insert " << exp << " " << cbefore << "->" << ev->p_timers.size() << std::endl;
-        } else {
-            auto fi = ev->p_timers.find(this);
-            if (fi != ev->p_timers.end()) {
-            int cbefore = ev->p_timers.size();
-                ev->p_timers.erase(fi);
-    //           std::cerr << "T " << this <<  " " <<  k__debugName << " erase " << " " << cbefore << "->" << ev->p_timers.size() << std::endl;
-            }
-        }
+        int cbefore = ev->p_timers.size();
+        ev->p_timers.insert(this);
+//        std::cerr << "T " << this <<  " " <<  k__debugName << " insert " << exp << " " << cbefore << "->" << ev->p_timers.size() << std::endl;
     }
     return el;
 }
 
-
 uint64_t Timer::elapsed()
 {
+    if (p_start == 0)
+        return 0;
+
     struct timespec current;
     if (clock_gettime(CLOCK_MONOTONIC_RAW, &current)) {
         //TODO  Oops, getting clock time failed
@@ -100,13 +88,38 @@ uint64_t Timer::expires()
     return p_expires - el;
 }
 
+void Timer::start()
+{
+    struct timespec begin;
+    if (clock_gettime(CLOCK_MONOTONIC_RAW, &begin)) {
+        throw std::runtime_error("Kite::Timer: no clock :(");
+        p_start = 0;
+        return;
+    }
+    p_start = begin.tv_sec  * 1000
+            + begin.tv_nsec * 1e-6;
+}
+
 
 void Timer::doExpire()
 {
     if (onExpired()) {
         reset(p_period_intent);
     } else {
-        reset(0);
+        removeFromEventLoop();
+    }
+}
+
+void Timer::removeFromEventLoop()
+{
+    auto ev = p_ev.lock();
+    if (ev) {
+        auto fi = ev->p_timers.find(this);
+        if (fi != ev->p_timers.end()) {
+            int cbefore = ev->p_timers.size();
+            ev->p_timers.erase(fi);
+//            std::cerr << "T " << this <<  " " <<  k__debugName << " erase " << " " << cbefore << "->" << ev->p_timers.size() << std::endl;
+        }
     }
 }
 
@@ -126,7 +139,7 @@ private:
         if (fn()) {
             reset(p_period_intent);
         } else {
-            reset(0);
+            removeFromEventLoop();
             delete this;
         }
     }

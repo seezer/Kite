@@ -24,7 +24,7 @@ namespace Kite {
         static uint64_t now();
 
         static void later(const std::weak_ptr<Kite::EventLoop> &ev, const std::function<bool()> &fn,
-                uint64_t ms = 1,
+                uint64_t ms = 0,
                 const char *name = "later");
 
         Timer (const std::weak_ptr<Kite::EventLoop> &ev, uint64_t expire = 0);
@@ -32,6 +32,12 @@ namespace Kite {
         uint64_t reset(uint64_t expire = 0);
         uint64_t elapsed();
         uint64_t expires();
+
+        /**
+         * Timers with an expiration time of 0 don't start automatically.
+         * To use them for time keeping, call start() as the reference for subsequent elapsed() calls.
+         */
+        void start();
 
         const char *k__debugName;
 
@@ -47,6 +53,7 @@ namespace Kite {
         uint64_t p_period_intent;
     private:
         virtual void doExpire();
+        void removeFromEventLoop();
         uint64_t p_start;
         uint64_t p_expires;
         std::weak_ptr<EventLoop> p_ev;

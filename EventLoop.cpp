@@ -77,6 +77,9 @@ int EventLoop::exec()
             auto tt = (*it)->expires();
             if (tt < timeout)
                 timeout = tt;
+            // FIXME can be < 0? shouldn't as it would block in poll()
+            if (timeout == 0)
+                break;
         }
 
 
