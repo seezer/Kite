@@ -127,6 +127,6 @@ void EventLoop::exit(int e)
             p_exitCode = e;
             p_running = false;
             return false;
-    }, 1, "exit");
+    }, 0, "exit");
     write(p_intp[1], "\n", 1);
 }

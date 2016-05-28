@@ -46,7 +46,7 @@ public:
                 Timer::later(ev(), [this](){
                     onActivated(0);
                     return false;
-                }, 1, "BIO_pending after read");
+                }, 0, "BIO_pending after read");
             }
         }
     }
